@@ -72,7 +72,12 @@ func GetUser(username string) (*entities.User, error) {
 	if err != nil {
 		return nil, err
 	}
+	tokens, err := GetUserTokens(username)
+	if err != nil {
+		return nil, err
+	}
 	user.Stations = stations
+	user.Accounts = tokens
 	return user, err
 }
 
@@ -202,4 +207,66 @@ func getUserStations(username string) ([]entities.Station, error) {
 		stations = append(stations, *station)
 	}
 	return stations, err
+}
+
+// Retrieves the stations for which the user is an admin
+func GetUserTokens(username string) ([]entities.Tokens, error) {
+	tokens := []entities.Tokens{}
+
+	row := db.QueryRow(
+		"SELECT access_token, refresh_token FROM spotify_tokens WHERE username=?",
+		username,
+	)
+	token, err := mappers.FromRowToTokens(row)
+	if err != nil {
+		return []entities.Tokens{}, nil
+	}
+	token.Source = "spotify"
+	tokens = append(tokens, *token)
+
+	return tokens, err
+}
+
+// Update existing user in the database
+func AddAccount(username string, source string, tokens*entities.Tokens) (*entities.User, error) {
+	if source == "spotify" {
+		_, err := db.Query(
+			"INSERT INTO spotify_tokens (username, access_token, refresh_token) values (?,?,?);",
+			username,
+			tokens.AccessToken,
+			tokens.RefreshToken,
+		)
+		//TODO duplicate key error specifically not just any error
+		if err != nil {
+			fmt.Println(err)
+			// return nil, err
+		}
+	}
+	user, err := GetUser(username)
+	if err != nil {
+		return nil, err
+	}
+	return user, err
+}
+
+
+// Update existing user in the database
+func RefreshToken(username string, source string, access_token string) (*entities.User, error) {
+	if source == "spotify" {
+		_, err := db.Query(
+			"UPDATE spotify_tokens SET access_token=? WHERE username=?",
+			access_token,
+			username,
+		)
+		//TODO duplicate key error specifically not just any error
+		if err != nil {
+			fmt.Println(err)
+			// return nil, err
+		}
+	}
+	user, err := GetUser(username)
+	if err != nil {
+		return nil, err
+	}
+	return user, err
 }

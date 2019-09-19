@@ -1,9 +1,9 @@
 package entities
 
 type Song struct {
-    Id          int         `json:"-""`
+    Id          int         `json:"id"`
     Source      string      `json:"source"`
-    SongId      string      `json:"song_id"`
+    SongId      string      `json:"source_id"`
     Title       string      `json:"title"`
     Artist      string      `json:"artist"`
     AlbumUrl    string      `json:"album_url"`

@@ -70,6 +70,13 @@ func GetStation(creator string, stationName string) (*entities.Station, error) {
 	}
 	station.Songs = songs
 
+	playing, err := getStationPlaying(station.Id)
+	if err != nil {
+		//TODO HANDLE NO SONG PLAYING ERROR?
+		err = nil
+	} else {
+		station.Playing = *playing
+	}
 	return station, err
 }
 
@@ -93,6 +100,12 @@ func GetStationById(stationId int) (*entities.Station, error) {
 		return nil, err
 	}
 	station.Songs = songs
+
+	playing, err := getStationPlaying(station.Id)
+	if err != nil {
+		return nil, err
+	}
+	station.Playing = *playing
 
 	return station, err
 }
@@ -194,6 +207,18 @@ func ChangeVote(station_id int, song_id int, isAdd bool) (*entities.Station, err
 	return station, err
 }
 
+func ResetVote(station_id int, song_id int) (*entities.Station, error) {
+	_, err := db.Query(fmt.Sprintf("UPDATE station_songs SET votes = 0 WHERE station_id = '%v' AND song_id = '%v'", station_id, song_id))
+	if err != nil {
+		return nil, err
+	}
+	station, err := GetStationById(station_id)
+	if err != nil {
+		return nil, err
+	}
+	return station, err
+}
+
 func getStationSongs(station_id int) ([]entities.Song, error) {
 	rows, err := db.Query(
 		"SELECT song_id FROM station_songs WHERE station_id=?",
@@ -255,25 +280,20 @@ func PlayNext(creator string, stationName string) (*entities.Station, error) {
 	}
 	if len(songs) > 0 {
 		song_id := songs[len(songs)-1].Id
-
 		station, err := RemoveSong(station_id, song_id)
-		// Not sure if we need DB this or not
-		// _, err = db.Query(
-		// 	"INSERT INTO station_playing (station_id, song_id) values (?,?);",
-		// 	station_id,
-		// 	song_id,
-		// )
-		// if err != nil {
-		// 	return nil, err
-		// }
-		station.Playing = entities.Playing{
+		playing := entities.Playing{
 			Playing: true,
 			Song: songs[len(songs)-1],
 			Position: 0,
 			Timestamp: time.Now().UTC().UnixNano() / 1e6,
 		}
+		station, err = UpdatePlaying(creator, stationName, &playing)
+		if err != nil {
+			return nil, err
+		}
 		return station, err
 	} else {
+		RemovePlaying(creator, stationName)
 		station, err := ShuffleDefaults(creator, stationName)
 		if err != nil {
 			return nil, err
@@ -296,10 +316,65 @@ func RemoveSong(station_id int, song_id int) (*entities.Station, error) {
 	return station, nil
 }
 
+
+//TODO Shuffle Songs
 func ShuffleDefaults(creator string, stationName string) (*entities.Station, error) {
 	station, err := GetStation(creator, stationName)
+	for _, song := range station.Songs{
+		ResetVote(station.Id, song.Id)
+	}
+	station, err = GetStation(creator, stationName)
+
 	if err != nil {
 		return nil, err
 	}
+	return station, nil
+}
+
+
+
+//TODO Make Mapper
+func getStationPlaying(station_id int) (*entities.Playing, error) {
+	row := db.QueryRow(
+		"SELECT song_id, position, timestamp, playing FROM station_playing WHERE station_id=?",
+		station_id,
+	)
+	playing, song_id, err := mappers.FromRowToPlaying(row)
+	if err != nil {
+		return nil, err
+	}
+
+	song, err := GetSongById(song_id)
+	if err != nil {
+		return nil, err
+	}
+	playing.Song = *song
+	return playing, nil
+}
+
+func RemovePlaying(creator string, stationName string) {
+	station_id, _ := GetStationId(creator, stationName)
+	//TODO Handle error?
+	_ = db.QueryRow(
+		"DELETE FROM station_playing WHERE station_id=?",
+		station_id,
+	)
+}
+
+func UpdatePlaying(creator string, stationName string, updatePlaying *entities.Playing) (*entities.Station, error) {
+	RemovePlaying(creator, stationName)
+	station_id, err := GetStationId(creator, stationName)
+	_, err = db.Query(
+		"INSERT INTO station_playing (station_id, song_id, position, timestamp, playing) values (?,?,?,?,?);",
+		station_id,
+		updatePlaying.Song.Id,
+		updatePlaying.Position,
+		updatePlaying.Timestamp,
+		updatePlaying.Playing,
+	)
+	if err != nil {
+		return nil, err
+	}
+	station, _  := GetStation(creator, stationName)
 	return station, nil
 }

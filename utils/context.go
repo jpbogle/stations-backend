@@ -102,8 +102,8 @@ func (ctx *Context) Error(err error, status int) {
 	}, status)
 }
 
-func (ctx *Context) OpenWebsocket(station *entities.Station) {
-	globalWebsockets.OpenWebsocket(ctx, station)
+func (ctx *Context) OpenWebsocket(station *entities.Station, isAdmin bool) {
+	globalWebsockets.OpenWebsocket(ctx, station, isAdmin)
 }
 
 

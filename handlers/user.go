@@ -6,6 +6,12 @@ import (
 	"stations/controllers"
 	"stations/entities"
 	"stations/utils"
+	"fmt"
+	"net/url"
+	// "io/ioutil"
+	"strings"
+	b64 "encoding/base64"
+
 )
 
 func registerUser(apiHandler *utils.Handler) {
@@ -94,6 +100,8 @@ func registerUser(apiHandler *utils.Handler) {
 		}
 
 		user, err := controllers.LoginUser(&loginUserRequest)
+		fmt.Println(err)
+
 		if notFoundErr, ok := err.(*entities.NotFoundError); ok {
 			ctx.Error(notFoundErr, http.StatusUnauthorized)
 			return
@@ -101,6 +109,7 @@ func registerUser(apiHandler *utils.Handler) {
 			ctx.Error(err, http.StatusInternalServerError)
 			return
 		}
+
 
 		if user == nil { // bad credentials supplied
 			ctx.Error(&entities.Error{Msg: "Bad credentials"}, http.StatusUnauthorized)
@@ -113,6 +122,111 @@ func registerUser(apiHandler *utils.Handler) {
 			User: user,
 		}
 		ctx.RespondJson(resp, http.StatusOK)
+	})
+
+	// Add an account to a user
+	apiHandler.Post("/users/:username/accounts", func(ctx *utils.Context) {
+		var addAccountRequest entities.AddAccountRequest
+
+		if err := json.NewDecoder(ctx.Req.Body).Decode(&addAccountRequest); err != nil {
+			ctx.Error(err, http.StatusBadRequest)
+			return
+		}
+		username := ctx.Fields["username"]
+		clientId := "bec7cb795af042689409eb98a961e77e"
+        clientSecret := "de284712da9d4cff85f5e537d055c9b5"
+
+		// bytesRepresentation, err := json.Marshal(message)
+		if addAccountRequest.Source == "spotify" {
+			client := &http.Client{}
+			form := url.Values{}
+			form.Set("code", addAccountRequest.Code)
+			form.Add("grant_type", "authorization_code")
+			form.Add("redirect_uri", "http://localhost:4000/dashboard")
+
+			req, err := http.NewRequest("POST", "https://accounts.spotify.com/api/token", strings.NewReader(form.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.Header.Set("Authorization", "Basic " + b64.StdEncoding.EncodeToString([]byte(clientId + ":" + clientSecret)))
+
+			res, err := client.Do(req)
+			defer res.Body.Close()
+			fmt.Println(res.Body)
+			var tokens entities.Tokens
+			if err := json.NewDecoder(res.Body).Decode(&tokens); err != nil {
+				ctx.Error(err, http.StatusBadRequest)
+				return
+			}
+
+			var user *entities.User
+			user, err = controllers.AddAccount(username, "spotify", &tokens)
+			if err != nil {
+				ctx.Error(err, http.StatusBadRequest)
+				return
+			}
+
+			resp := entities.GetUserResponse{
+				User: user,
+			}
+			ctx.RespondJson(resp, http.StatusOK)
+			return
+		}
+		ctx.Respond("<h1>Here's an api route demo!</h1>", http.StatusOK)
+	})
+
+	// Add an account to a user
+	apiHandler.Get("/users/:username/refresh/:source", func(ctx *utils.Context) {
+
+		username := ctx.Fields["username"]
+
+		clientId := "bec7cb795af042689409eb98a961e77e"
+        clientSecret := "de284712da9d4cff85f5e537d055c9b5"
+
+		// bytesRepresentation, err := json.Marshal(message)
+		if  ctx.Fields["source"] == "spotify" {
+			oldTokens, err := controllers.GetUserTokens(username)
+			if err !=nil {
+				ctx.Error(err, http.StatusBadRequest)
+				return
+			}
+			var refreshToken string
+			for _, v := range oldTokens {
+			    if v.Source == "spotify" {
+			    	refreshToken = v.RefreshToken
+			    }
+			}
+
+			client := &http.Client{}
+			form := url.Values{}
+			form.Set("refresh_token", refreshToken)
+			form.Add("grant_type", "refresh_token")
+
+			req, err := http.NewRequest("POST", "https://accounts.spotify.com/api/token", strings.NewReader(form.Encode()))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.Header.Set("Authorization", "Basic " + b64.StdEncoding.EncodeToString([]byte(clientId + ":" + clientSecret)))
+
+			res, err := client.Do(req)
+			defer res.Body.Close()
+			fmt.Println(res.Body)
+			var tokens entities.Tokens
+			if err := json.NewDecoder(res.Body).Decode(&tokens); err != nil {
+				ctx.Error(err, http.StatusBadRequest)
+				return
+			}
+
+			var user *entities.User
+			user, err = controllers.RefreshToken(username, "spotify", tokens.AccessToken)
+			if err != nil {
+				ctx.Error(err, http.StatusBadRequest)
+				return
+			}
+
+			resp := entities.GetUserResponse{
+				User: user,
+			}
+			ctx.RespondJson(resp, http.StatusOK)
+			return
+		}
+		ctx.Respond("<h1>Here's an api route demo!</h1>", http.StatusOK)
 	})
 
 	// Clear the client's session

@@ -32,3 +32,11 @@ func FromRowToShallowUser(row scannable) (*entities.ShallowUser, error) {
 	}
 	return &user, nil
 }
+
+func FromRowToTokens(row scannable) (*entities.Tokens, error) {
+	var tokens entities.Tokens
+	if err := row.Scan(&tokens.AccessToken, &tokens.RefreshToken); err != nil {
+		return nil, err
+	}
+	return &tokens, nil
+}

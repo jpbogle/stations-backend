@@ -7,7 +7,7 @@ import (
     "stations/entities"
     "github.com/gorilla/websocket"
     "encoding/base64"
-    // "stations/controllers"
+    "stations/controllers"
     // "sync"
     // "time"
     // "fmt"
@@ -22,8 +22,9 @@ type websocketManager struct {
 
 type Websocket struct {
     id              string
+    creator         string
+    stationName     string
     broadcast       chan entities.StationBroadcast
-    currentSong     entities.Playing
     listeners       map[*websocket.Conn]bool
     admins          map[*websocket.Conn]bool
     upgrader        websocket.Upgrader
@@ -66,7 +67,7 @@ func CreateWebsocketManager() *websocketManager {
 //////////////////////////////////////////////////////////////////////////////\
 ///
 // Creates a new websocket or gets existing one from websocketManager
-func (wm *websocketManager) OpenWebsocket(ctx *Context, station *entities.Station) {
+func (wm *websocketManager) OpenWebsocket(ctx *Context, station *entities.Station, isAdmin bool) {
     // wm.lock.Lock()
     id := wm.getSocketId(ctx)
     var socket *Websocket
@@ -80,6 +81,8 @@ func (wm *websocketManager) OpenWebsocket(ctx *Context, station *entities.Statio
         }
         socket = &Websocket{
             id: id,
+            creator: station.Creator,
+            stationName: station.Name,
             broadcast: make(chan entities.StationBroadcast),
             listeners: make(map[*websocket.Conn]bool),
             admins: make(map[*websocket.Conn]bool),
@@ -90,10 +93,18 @@ func (wm *websocketManager) OpenWebsocket(ctx *Context, station *entities.Statio
         //Listen from client loop
         go socket.send()
         // go socket.checkTime(ctx.Fields["username"], ctx.Fields["stationName"])
-        socket.addAdmin(ctx, id, station)
+        if isAdmin {
+            socket.addAdmin(ctx, id, station)
+        } else {
+            socket.adminError(ctx, id, station)
+        }
     } else {
         // wm.lock.Unlock()
-        socket.addListener(ctx, station)
+        if isAdmin {
+            socket.addAdmin(ctx, id, station)
+        } else {
+            socket.addListener(ctx, station)
+        }
     }
 }
 
@@ -149,6 +160,21 @@ func (wm *websocketManager) Broadcast(ctx *Context, station *entities.Station, h
 }
 
 
+func (wm *websocketManager) AdminBroadcast(ctx *Context, station *entities.Station, header string, message string, isAdmin bool) {
+    id := wm.getSocketId(ctx)
+    if socket, ok := wm.Websockets[id]; ok {
+        response := entities.StationBroadcast{
+            Station: station,
+            Header: header,
+            Message: message,
+            Admin: isAdmin,
+        }
+        socket.broadcast <- response
+    }
+}
+
+
+
 //////////////////////////////////////////////////////////////////////////////
 //
 // Pritave websocketManager methods
@@ -171,6 +197,24 @@ func (wm *websocketManager) getSocketId(ctx *Context) string {
 //
 //////////////////////////////////////////////////////////////////////////////
 
+func (socket *Websocket) adminError(ctx *Context, id string, station *entities.Station) {
+    ws, err := socket.upgrader.Upgrade(ctx.Res, ctx.Req, nil)
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer ws.Close()
+    log.Printf(
+        "WS ERROR /%s/%s %s%v\x1b[0m\n",
+        ctx.Fields["username"],
+        ctx.Fields["stationName"],
+        "\x1b[32m",
+        200,
+    )
+    globalWebsockets.AdminBroadcast(ctx, station, "Error", "Station unavailable, no admins", false)
+    socket.receiveNothing(ws)
+    // globalWebsockets.CloseWebsocket(id)
+}
+
 // Adds a new host to a given websocket
 func (socket *Websocket) addAdmin(ctx *Context, id string, station *entities.Station) {
     ws, err := socket.upgrader.Upgrade(ctx.Res, ctx.Req, nil)
@@ -187,14 +231,7 @@ func (socket *Websocket) addAdmin(ctx *Context, id string, station *entities.Sta
         "\x1b[32m",
         200,
     )
-    broadcast := entities.StationBroadcast{
-        Station: station,
-        Player: &socket.currentSong,
-        Admin: true,
-        Header: "Welcome",
-        Message: "Welcome to the station! You are now the admin",
-    }
-    ws.WriteJSON(broadcast)
+    globalWebsockets.AdminBroadcast(ctx, station, "Welcome", "Welcome to the station! You are an admin", true)
     socket.receivePlaying(ws, id)
 }
 
@@ -218,14 +255,7 @@ func (socket *Websocket) addListener(ctx *Context, station *entities.Station) {
     // for socket := range globalWebsockets.Websockets {
     //     log.Println(socket, globalWebsockets.Websockets[socket].listeners)
     // }
-    broadcast := entities.StationBroadcast{
-        Station: station,
-        Player: &socket.currentSong,
-        Admin: false,
-        Header: "Welcome",
-        Message: "Welcome to the station!",
-    }
-    ws.WriteJSON(broadcast)
+    globalWebsockets.AdminBroadcast(ctx, station, "Welcome", "Welcome to the station!", false)
     socket.receiveNothing(ws)
 }
 
@@ -246,7 +276,7 @@ func (socket *Websocket) receiveNothing(ws *websocket.Conn) {
 
 func (socket *Websocket) receivePlaying(ws *websocket.Conn, id string) {
     for {
-        var nowPlaying entities.Playing
+        var nowPlaying *entities.Playing
         // Read in a new message as JSON and map it to a nowPlaying object
         err := ws.ReadJSON(&nowPlaying)
         if err != nil {
@@ -259,9 +289,11 @@ func (socket *Websocket) receivePlaying(ws *websocket.Conn, id string) {
             }
             break
         }
-        socket.currentSong = nowPlaying
+        nextStation, _ := controllers.UpdatePlaying(socket.creator, socket.stationName, nowPlaying)
         broadcast := entities.StationBroadcast{
-            Player: &nowPlaying,
+            Station: nextStation,
+            Header: "Received playing",
+            Message: "updating player...",
         }
         socket.broadcast <-  broadcast
     }

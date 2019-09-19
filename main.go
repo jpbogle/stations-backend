@@ -9,7 +9,7 @@ import (
 	h "stations/handlers"
     "stations/utils"
 	"sync"
-    "github.com/fvbock/endless"
+    // "github.com/fvbock/endless"
 )
 
 var IS_DEBUG = false
@@ -29,10 +29,10 @@ func main() {
     // serve index (and anything else) as https
     // mux := http.NewServeMux()
     // mux.HandleFunc("/", h.RootHandler.ServeHTTP)
-    // http.ListenAndServeTLS(":8081", "cert.pem", "key.pem", h.RootHandler)
+    go http.ListenAndServe(":8100", h.RootHandler)
 
-	go endless.ListenAndServe(":8080", h.RootHandler)
-	log.Print("\n> Now listening on localhost:8080\n\n")
+	// go endless.ListenAndServe(":8080", h.RootHandler)
+	log.Print("\n> Now listening on localhost:8100\n\n")
 	wg.Wait()
 }
 

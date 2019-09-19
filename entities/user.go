@@ -12,12 +12,18 @@ type User struct {
 	Stations []Station `json:"stations"`
 	Hash     string    `json:"-"`
 	Salt     string    `json:"-"`
-
-	SpotifyAccount SpotifyAccount `json:"spotify_account"`
+	Accounts  []Tokens   `json:"accounts"`
 }
 
-type SpotifyAccount struct {
+type Tokens struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	Source		 string `json:"source"`
+}
+
+type Account struct {
 	Username     string `json:"username"`
+	ImageUrl 	 string `json:"image_url"`
 	AccessToken  string `json:"access_token"`
 	RefreshToken string `json:"refresh_token"`
 }

@@ -67,15 +67,24 @@ func createTables() {
 			log.Printf("Problem creating table 'station_songs'... %s", err)
 		}
 	}
-	// _, err = db.Query("CREATE TABLE station_playing (station_id INT unsigned NOT NULL, song_id INT unsigned NOT NULL, votes INT NOT NULL, FOREIGN KEY (song_id) REFERENCES songs(id), FOREIGN KEY (station_id) REFERENCES stations(id), PRIMARY KEY(station_id, song_id));")
-	// if err != nil {
-	// 	if sqlErr, ok := err.(*mysql.MySQLError); ok && sqlErr.Number != ALREADY_CREATED_ERR {
-	// 		log.Printf("Problem creating table 'station_playing'... %s", err)
-	// 	}
-	// }
+
+	_, err = db.Query("CREATE TABLE spotify_tokens (username varchar(30), access_token varchar(200) NOT NULL, refresh_token varchar(200) NOT NULL, FOREIGN KEY (username) REFERENCES users(username), PRIMARY KEY (username));")
+	if err != nil {
+		if sqlErr, ok := err.(*mysql.MySQLError); ok && sqlErr.Number != ALREADY_CREATED_ERR {
+			log.Printf("Problem creating table 'spotify_tokens'... %s", err)
+		}
+	}
+
+	_, err = db.Query("CREATE TABLE station_playing (station_id INT unsigned NOT NULL, song_id INT unsigned NOT NULL, position INT NOT NULL, timestamp BIGINT NOT NULL, playing BOOL, FOREIGN KEY (song_id) REFERENCES songs(id), FOREIGN KEY (station_id) REFERENCES stations(id), PRIMARY KEY(station_id));")
+	if err != nil {
+		if sqlErr, ok := err.(*mysql.MySQLError); ok && sqlErr.Number != ALREADY_CREATED_ERR {
+			log.Printf("Problem creating table 'station_playing'... %s", err)
+		}
+	}
 }
 
 func DropTables() {
+	db.Query("drop table spotify_users;")
 	db.Query("drop table station_admins;")
 	db.Query("drop table station_songs;")
 	db.Query("drop table songs;")

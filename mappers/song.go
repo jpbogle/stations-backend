@@ -24,3 +24,12 @@ func FromRowToSong(row scannable) (*entities.Song, error) {
     }
     return &song, nil
 }
+
+func FromRowToPlaying(row scannable) (*entities.Playing, int, error) {
+    var playing entities.Playing
+    var song_id int
+    if err := row.Scan(&song_id, &playing.Position, &playing.Timestamp, &playing.Playing); err != nil {
+        return nil, -1, err
+    }
+    return &playing, song_id, nil
+}

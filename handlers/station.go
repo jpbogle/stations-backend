@@ -22,6 +22,7 @@ func registerStation(apiHandler *utils.Handler) {
 
 	// go handleStationChange()
 
+	// TODO Replace with a POST endpoint that takes userID / username
 	apiHandler.Get("/:username/:stationName/ws", func(ctx *utils.Context) {
 		station, err := controllers.GetStation(ctx.Fields["username"], ctx.Fields["stationName"])
 		if err != nil {
@@ -29,7 +30,36 @@ func registerStation(apiHandler *utils.Handler) {
 			return
 		}
 		ctx.Broadcast(station, "New Listener", "Someone tuned in!")
-		ctx.OpenWebsocket(station)
+		ctx.OpenWebsocket(station, true)
+	})
+
+
+	apiHandler.Post("/:username/:stationName/ws", func(ctx *utils.Context) {
+		var getStationRequest entities.GetStationRequest
+		if err := json.NewDecoder(ctx.Req.Body).Decode(&getStationRequest); err != nil {
+			ctx.Error(err, http.StatusBadRequest)
+			return
+		}
+		username := getStationRequest.Username
+		station, err := controllers.GetStation(ctx.Fields["username"], ctx.Fields["stationName"])
+		if err != nil {
+			ctx.Error(err, http.StatusInternalServerError)
+			return
+		}
+		//TODO check if admin
+		isAdmin := true
+		numAdmins := 0
+		for _, shallowUser := range station.Admins {
+			if shallowUser.Username == username {
+				numAdmins += 1
+			}
+		}
+		// if len(station.Admins.reduce(shallowUser -> shallowUser.Username == username)) <= 0 {
+		if numAdmins <= 0 {
+			isAdmin = false
+		}
+		ctx.Broadcast(station, "New Listener", "Someone tuned in!")
+		ctx.OpenWebsocket(station, isAdmin)
 	})
 
 	// Get a station's info
@@ -94,16 +124,22 @@ func registerStation(apiHandler *utils.Handler) {
 		ctx.RespondJson(resp, http.StatusOK)
 	})
 
-
 	// Get all songs in a station
-	apiHandler.Post("/:username/:stationName/songs", func(ctx *utils.Context) {
-		ctx.Respondf(
-			"<h1>Welcome to the station %s, %s</h1>Song json here!",
-			http.StatusOK,
-			ctx.Fields["stationName"],
-			ctx.Fields["username"],
-		)
+	apiHandler.Get("/:username/:stationName/shuffle", func(ctx *utils.Context) {
+		station, err := controllers.ShuffleDefaults(ctx.Fields["username"], ctx.Fields["stationName"]);
+		if err != nil {
+			ctx.Error(err, http.StatusInternalServerError)
+			return
+		}
+		message := fmt.Sprintf("Station shuffled...")
+		resp := entities.CreateStationResponse{
+			Station: station,
+		}
+
+		ctx.Broadcast(station, "Shuffle", message)
+		ctx.RespondJson(resp, http.StatusOK)
 	})
+
 
 	// Add a song to a station
 	apiHandler.Post("/:username/:stationName/songs/add", func(ctx *utils.Context) {

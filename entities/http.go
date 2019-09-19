@@ -21,6 +21,12 @@ type UpdateUserRequest struct {
 	Token     string `json:"token"`
 }
 
+type AddAccountRequest struct {
+	Code  	 string `json:"code"`
+	Source   string `json:"source"`
+	Username string
+}
+
 type LoginUserRequest struct {
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -30,6 +36,11 @@ type CreateStationRequest struct {
 	Username    string `json:"username"`
 	StationName string `json:"station_name"`
 }
+
+type GetStationRequest struct {
+	Username    string `json:"username"`
+}
+
 
 type AddAdminRequest struct {
 	Username    string `json:"username"`
@@ -56,8 +67,16 @@ type AddSongRequest struct {
 type VoteRequest struct {
 	Source      string	 	  `json:"source"`
 	SourceId 	string		  `json:"source_id"`
-	Action  	string		  `json:"action`
+	Action  	string		  `json:"action"`
 }
+
+type UpdatePlaying struct {
+	Playing 	bool   		`json:"playing"`
+	SongId    	int   		`json:"song_id"`
+	Position   	int    		`json:"position"`
+	Timestamp	int64	    `json:"timestamp"`
+}
+
 
 
 
@@ -94,7 +113,6 @@ type CreateSongResponse struct {
 
 type StationBroadcast struct {
 	Station *Station `json:"station"`
-	Player  *Playing `json:"player"`
 	Header  string	 `json:"header"`
 	Message string   `json:"message"`
 	Admin   bool	 `json:"admin"`
