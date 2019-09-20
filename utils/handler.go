@@ -72,6 +72,7 @@ type statusResponseWriter struct {
 func createStatusResponseWriter(w http.ResponseWriter, IS_DEBUG bool) *statusResponseWriter {
 	if IS_DEBUG {
 		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4000")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS")
 	} else {
 		w.Header().Set("Access-Control-Allow-Origin", "http://stations.live")
 	}
@@ -120,4 +121,8 @@ func (w *statusResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
 
 func SetDebug(debug bool) {
 	IS_DEBUG = debug
+}
+
+func IsDebug() bool {
+	return IS_DEBUG
 }

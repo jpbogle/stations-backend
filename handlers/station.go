@@ -20,46 +20,35 @@ import (
 
 func registerStation(apiHandler *utils.Handler) {
 
-	// go handleStationChange()
-
-	// TODO Replace with a POST endpoint that takes userID / username
-	apiHandler.Get("/:username/:stationName/ws", func(ctx *utils.Context) {
+	// Tune in with a username
+	apiHandler.Get("/:username/:stationName/ws/:listener", func(ctx *utils.Context) {
 		station, err := controllers.GetStation(ctx.Fields["username"], ctx.Fields["stationName"])
 		if err != nil {
 			ctx.Error(err, http.StatusInternalServerError)
 			return
 		}
-		ctx.Broadcast(station, "New Listener", "Someone tuned in!")
-		ctx.OpenWebsocket(station, true)
-	})
-
-
-	apiHandler.Post("/:username/:stationName/ws", func(ctx *utils.Context) {
-		var getStationRequest entities.GetStationRequest
-		if err := json.NewDecoder(ctx.Req.Body).Decode(&getStationRequest); err != nil {
-			ctx.Error(err, http.StatusBadRequest)
-			return
-		}
-		username := getStationRequest.Username
-		station, err := controllers.GetStation(ctx.Fields["username"], ctx.Fields["stationName"])
-		if err != nil {
-			ctx.Error(err, http.StatusInternalServerError)
-			return
-		}
-		//TODO check if admin
-		isAdmin := true
-		numAdmins := 0
+		isAdmin := station.Creator == ctx.Fields["listener"]
 		for _, shallowUser := range station.Admins {
-			if shallowUser.Username == username {
-				numAdmins += 1
+			if shallowUser.Username == ctx.Fields["listener"] {
+				isAdmin = true
 			}
 		}
-		// if len(station.Admins.reduce(shallowUser -> shallowUser.Username == username)) <= 0 {
-		if numAdmins <= 0 {
-			isAdmin = false
+		if isAdmin {
+			ctx.Broadcast(station, "New Admin", "Someone is now controlling the station!")
+		} else {
+			ctx.Broadcast(station, "New Listener", "Someone tuned in!")
 		}
-		ctx.Broadcast(station, "New Listener", "Someone tuned in!")
 		ctx.OpenWebsocket(station, isAdmin)
+	})
+
+	// Tune in without a username
+	apiHandler.Get("/:username/:stationName/ws/", func(ctx *utils.Context) {
+		station, err := controllers.GetStation(ctx.Fields["username"], ctx.Fields["stationName"])
+		if err != nil {
+			ctx.Error(err, http.StatusInternalServerError)
+			return
+		}
+		ctx.OpenWebsocket(station, false)
 	})
 
 	// Get a station's info

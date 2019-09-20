@@ -6,6 +6,7 @@ import (
 	"stations/mappers"
 	"sort"
 	"time"
+	"math/rand"
 )
 
 //Create a new station in the database
@@ -168,13 +169,15 @@ func AddSong(addSongRequest *entities.AddSongRequest) (*entities.Station, error)
 	if err != nil {
 		return nil, err
 	}
+	priority := len(station.Songs);
 	_, err = db.Query(
-		"INSERT INTO station_songs (station_id, song_id, votes) values (?,?,0);",
+		"INSERT INTO station_songs (station_id, song_id, votes, priority) values (?,?,0,?);",
 		station.Id,
 		song.Id,
+		priority,
 	)
 
-	//TODO: Check if duplicate key error ----
+	//TODO: Check if duplicate key error instead of assuming ----
 	if err != nil {
 		_, err := ChangeVote(station.Id, song.Id, true)
 		if err != nil {
@@ -219,6 +222,18 @@ func ResetVote(station_id int, song_id int) (*entities.Station, error) {
 	return station, err
 }
 
+func SetPriority(station_id int, song_id int, priority int) (*entities.Station, error) {
+	_, err := db.Query(fmt.Sprintf("UPDATE station_songs SET priority = '%v' WHERE station_id = '%v' AND song_id = '%v'", priority, station_id, song_id))
+	if err != nil {
+		return nil, err
+	}
+	station, err := GetStationById(station_id)
+	if err != nil {
+		return nil, err
+	}
+	return station, err
+}
+
 func getStationSongs(station_id int) ([]entities.Song, error) {
 	rows, err := db.Query(
 		"SELECT song_id FROM station_songs WHERE station_id=?",
@@ -245,6 +260,11 @@ func getStationSongs(station_id int) ([]entities.Song, error) {
 			return nil, err
 		}
 		song.Votes = *votes
+		priority, err := GetPriority(station_id, id)
+		if err != nil {
+			return nil, err
+		}
+		song.Priority = *priority
 		songs = append(songs, *song)
 	}
 	sort.Sort(songs)
@@ -262,6 +282,19 @@ func GetVotes(station_id int, song_id int) (*int, error) {
 		return nil, err
 	}
 	return &votes, nil
+}
+
+func GetPriority(station_id int, song_id int) (*int, error) {
+	row := db.QueryRow(
+		"SELECT priority FROM station_songs WHERE station_id=? AND song_id=?",
+		station_id,
+		song_id,
+	)
+	var priority int
+	if err := row.Scan(&priority); err != nil {
+		return nil, err
+	}
+	return &priority, nil
 }
 
 func PlayNext(creator string, stationName string) (*entities.Station, error) {
@@ -319,9 +352,12 @@ func RemoveSong(station_id int, song_id int) (*entities.Station, error) {
 
 //TODO Shuffle Songs
 func ShuffleDefaults(creator string, stationName string) (*entities.Station, error) {
+	rand.Seed(time.Now().UnixNano())
 	station, err := GetStation(creator, stationName)
 	for _, song := range station.Songs{
 		ResetVote(station.Id, song.Id)
+		priority := rand.Intn(len(station.Songs))
+		SetPriority(station.Id, song.Id, priority)
 	}
 	station, err = GetStation(creator, stationName)
 

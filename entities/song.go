@@ -9,6 +9,7 @@ type Song struct {
     AlbumUrl    string      `json:"album_url"`
     Duration    int         `json:"duration"`
     Votes       int         `json:"votes"`
+    Priority    int         `json:"priority"`
 }
 
 type Songs []Song
@@ -19,7 +20,11 @@ func (songs Songs) Len() int {
 }
 
 func (songs Songs) Less(i, j int) bool {
-    return songs[i].Votes < songs[j].Votes;
+    if songs[i].Votes != songs[j].Votes {
+        return songs[i].Votes < songs[j].Votes;
+    } else {
+        return songs[i].Priority > songs[j].Priority;
+    }
 }
 
 func (songs Songs) Swap(i, j int) {

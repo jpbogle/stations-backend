@@ -249,6 +249,22 @@ func AddAccount(username string, source string, tokens*entities.Tokens) (*entiti
 	return user, err
 }
 
+// Update existing user in the database
+func RemoveAccount(username string, source string) (*entities.User, error) {
+	if source == "spotify" {
+		_ = db.QueryRow(
+			"DELETE FROM spotify_tokens WHERE username=?",
+			username,
+		)
+		// TODO Handle error?
+	}
+	user, err := GetUser(username)
+	if err != nil {
+		return nil, err
+	}
+	return user, err
+}
+
 
 // Update existing user in the database
 func RefreshToken(username string, source string, access_token string) (*entities.User, error) {

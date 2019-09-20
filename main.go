@@ -29,10 +29,10 @@ func main() {
     // serve index (and anything else) as https
     // mux := http.NewServeMux()
     // mux.HandleFunc("/", h.RootHandler.ServeHTTP)
-    go http.ListenAndServe(":8100", h.RootHandler)
+    go http.ListenAndServe(":8080", h.RootHandler)
 
 	// go endless.ListenAndServe(":8080", h.RootHandler)
-	log.Print("\n> Now listening on localhost:8100\n\n")
+	log.Print("\n> Now listening on localhost:8080\n\n")
 	wg.Wait()
 }
 

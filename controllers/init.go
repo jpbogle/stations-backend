@@ -61,7 +61,7 @@ func createTables() {
 		}
 	}
 
-	_, err = db.Query("CREATE TABLE station_songs (station_id INT unsigned NOT NULL, song_id INT unsigned NOT NULL, votes INT NOT NULL, FOREIGN KEY (song_id) REFERENCES songs(id), FOREIGN KEY (station_id) REFERENCES stations(id), PRIMARY KEY(station_id, song_id));")
+	_, err = db.Query("CREATE TABLE station_songs (station_id INT unsigned NOT NULL, song_id INT unsigned NOT NULL, votes INT NOT NULL, priority INT NOT NULL, FOREIGN KEY (song_id) REFERENCES songs(id), FOREIGN KEY (station_id) REFERENCES stations(id), PRIMARY KEY(station_id, song_id));")
 	if err != nil {
 		if sqlErr, ok := err.(*mysql.MySQLError); ok && sqlErr.Number != ALREADY_CREATED_ERR {
 			log.Printf("Problem creating table 'station_songs'... %s", err)

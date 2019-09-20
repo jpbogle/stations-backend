@@ -103,7 +103,7 @@ func (wm *websocketManager) OpenWebsocket(ctx *Context, station *entities.Statio
         if isAdmin {
             socket.addAdmin(ctx, id, station)
         } else {
-            socket.addListener(ctx, station)
+            socket.addListener(ctx, id, station)
         }
     }
 }
@@ -203,6 +203,8 @@ func (socket *Websocket) adminError(ctx *Context, id string, station *entities.S
         log.Fatal(err)
     }
     defer ws.Close()
+    socket.listeners[ws] = true
+
     log.Printf(
         "WS ERROR /%s/%s %s%v\x1b[0m\n",
         ctx.Fields["username"],
@@ -211,8 +213,7 @@ func (socket *Websocket) adminError(ctx *Context, id string, station *entities.S
         200,
     )
     globalWebsockets.AdminBroadcast(ctx, station, "Error", "Station unavailable, no admins", false)
-    socket.receiveNothing(ws)
-    // globalWebsockets.CloseWebsocket(id)
+    socket.receiveNothing(ws, id)
 }
 
 // Adds a new host to a given websocket
@@ -231,12 +232,12 @@ func (socket *Websocket) addAdmin(ctx *Context, id string, station *entities.Sta
         "\x1b[32m",
         200,
     )
-    globalWebsockets.AdminBroadcast(ctx, station, "Welcome", "Welcome to the station! You are an admin", true)
+    globalWebsockets.AdminBroadcast(ctx, station, "Welcome", "An admin has signed on", true)
     socket.receivePlaying(ws, id)
 }
 
 // Adds a new listener to a given websocket
-func (socket *Websocket) addListener(ctx *Context, station *entities.Station) {
+func (socket *Websocket) addListener(ctx *Context, id string, station *entities.Station) {
     ws, err := socket.upgrader.Upgrade(ctx.Res, ctx.Req, nil)
     if err != nil {
         log.Fatal(err)
@@ -255,11 +256,11 @@ func (socket *Websocket) addListener(ctx *Context, station *entities.Station) {
     // for socket := range globalWebsockets.Websockets {
     //     log.Println(socket, globalWebsockets.Websockets[socket].listeners)
     // }
-    globalWebsockets.AdminBroadcast(ctx, station, "Welcome", "Welcome to the station!", false)
-    socket.receiveNothing(ws)
+    globalWebsockets.AdminBroadcast(ctx, station, "Welcome", "Someone has tuned in!", false)
+    socket.receiveNothing(ws, id)
 }
 
-func (socket *Websocket) receiveNothing(ws *websocket.Conn) {
+func (socket *Websocket) receiveNothing(ws *websocket.Conn, id string) {
     for {
         var nowPlaying entities.Playing
         // Read in a new message as JSON and map it to a nowPlaying object
@@ -267,7 +268,11 @@ func (socket *Websocket) receiveNothing(ws *websocket.Conn) {
         if err != nil {
             ws.Close()
             log.Printf("Socket receiving error: %v", err)
-            delete(socket.listeners, ws)
+            delete(socket.admins, ws)
+            if (len(socket.admins) == 0) {
+                log.Println("No admins: closing websocket")
+                globalWebsockets.CloseWebsocket(id)
+            }
             break
         }
         //Do not send channel if listener not admin
@@ -325,10 +330,11 @@ func (socket *Websocket) receivePlaying(ws *websocket.Conn, id string) {
 func (socket *Websocket) send() {
     for {
         // Grab the station from the broadcast channel
-        station := <- socket.broadcast
+        stationBroadcast := <- socket.broadcast
         // Send it out to every client that is currently connected
         for client := range socket.listeners {
-            err := client.WriteJSON(station)
+            stationBroadcast.Admin = false
+            err := client.WriteJSON(stationBroadcast)
             if err != nil {
                 log.Printf("Socket sending error: %v", err)
                 client.Close()
@@ -336,8 +342,8 @@ func (socket *Websocket) send() {
             }
         }
         for client := range socket.admins {
-            station.Admin = true
-            err := client.WriteJSON(station)
+            stationBroadcast.Admin = true
+            err := client.WriteJSON(stationBroadcast)
             if err != nil {
                 log.Printf("Socket sending error: %v", err)
                 client.Close()

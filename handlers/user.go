@@ -11,7 +11,6 @@ import (
 	// "io/ioutil"
 	"strings"
 	b64 "encoding/base64"
-
 )
 
 func registerUser(apiHandler *utils.Handler) {
@@ -133,16 +132,21 @@ func registerUser(apiHandler *utils.Handler) {
 			return
 		}
 		username := ctx.Fields["username"]
-		clientId := "bec7cb795af042689409eb98a961e77e"
-        clientSecret := "de284712da9d4cff85f5e537d055c9b5"
+
 
 		// bytesRepresentation, err := json.Marshal(message)
 		if addAccountRequest.Source == "spotify" {
+			clientId := "bec7cb795af042689409eb98a961e77e"
+			clientSecret := "de284712da9d4cff85f5e537d055c9b5"
 			client := &http.Client{}
 			form := url.Values{}
 			form.Set("code", addAccountRequest.Code)
 			form.Add("grant_type", "authorization_code")
-			form.Add("redirect_uri", "http://localhost:4000/dashboard")
+			if utils.IsDebug() {
+				form.Add("redirect_uri", "http://localhost:4000/dashboard")
+			} else {
+				form.Add("redirect_uri", "http://stations.live/dashboard")
+			}
 
 			req, err := http.NewRequest("POST", "https://accounts.spotify.com/api/token", strings.NewReader(form.Encode()))
 			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -173,7 +177,22 @@ func registerUser(apiHandler *utils.Handler) {
 		ctx.Respond("<h1>Here's an api route demo!</h1>", http.StatusOK)
 	})
 
-	// Add an account to a user
+	apiHandler.Delete("/users/:username/accounts/:source", func(ctx *utils.Context) {
+		username := ctx.Fields["username"]
+		source := ctx.Fields["source"]
+		var user *entities.User
+		user, err := controllers.RemoveAccount(username, source)
+		if err != nil {
+			ctx.Error(err, http.StatusBadRequest)
+			return
+		}
+		resp := entities.GetUserResponse{
+			User: user,
+		}
+		ctx.RespondJson(resp, http.StatusOK)
+		return
+	})
+
 	apiHandler.Get("/users/:username/refresh/:source", func(ctx *utils.Context) {
 
 		username := ctx.Fields["username"]
@@ -230,7 +249,7 @@ func registerUser(apiHandler *utils.Handler) {
 	})
 
 	// Clear the client's session
-	apiHandler.Post("/users/logout", func(ctx *utils.Context) {
+	apiHandler.Delete("/users/logout", func(ctx *utils.Context) {
 		ctx.DestroySession()
 		ctx.Respond("", http.StatusOK)
 	})
