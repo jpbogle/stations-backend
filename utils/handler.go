@@ -1,12 +1,12 @@
 package utils
 
 import (
-	"log"
-	"net/http"
-	"time"
-	"net"
 	"bufio"
 	"fmt"
+	"log"
+	"net"
+	"net/http"
+	"time"
 )
 
 var IS_DEBUG = false
@@ -68,15 +68,15 @@ type statusResponseWriter struct {
 	status int
 }
 
-
 func createStatusResponseWriter(w http.ResponseWriter, IS_DEBUG bool) *statusResponseWriter {
 	if IS_DEBUG {
-		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4000")
+		w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS")
 	} else {
 		w.Header().Set("Access-Control-Allow-Origin", "http://stations.live")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, DELETE, OPTIONS")
 	}
-    w.Header().Set("Access-Control-Allow-Credentials", "true")
+	w.Header().Set("Access-Control-Allow-Credentials", "true")
 	return &statusResponseWriter{
 		w,
 		0,

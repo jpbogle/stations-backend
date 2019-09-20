@@ -2,16 +2,15 @@ package controllers
 
 import (
 	"fmt"
+	"math/rand"
+	"sort"
 	"stations/entities"
 	"stations/mappers"
-	"sort"
 	"time"
-	"math/rand"
 )
 
 //Create a new station in the database
 func CreateStation(createStationRequest *entities.CreateStationRequest) (*entities.Station, error) {
-
 	_, err := db.Query(
 		"INSERT INTO stations (name, creator) values (?,?);",
 		createStationRequest.StationName,
@@ -169,7 +168,7 @@ func AddSong(addSongRequest *entities.AddSongRequest) (*entities.Station, error)
 	if err != nil {
 		return nil, err
 	}
-	priority := len(station.Songs);
+	priority := len(station.Songs)
 	_, err = db.Query(
 		"INSERT INTO station_songs (station_id, song_id, votes, priority) values (?,?,0,?);",
 		station.Id,
@@ -315,9 +314,9 @@ func PlayNext(creator string, stationName string) (*entities.Station, error) {
 		song_id := songs[len(songs)-1].Id
 		station, err := RemoveSong(station_id, song_id)
 		playing := entities.Playing{
-			Playing: true,
-			Song: songs[len(songs)-1],
-			Position: 0,
+			Playing:   true,
+			Song:      songs[len(songs)-1],
+			Position:  0,
 			Timestamp: time.Now().UTC().UnixNano() / 1e6,
 		}
 		station, err = UpdatePlaying(creator, stationName, &playing)
@@ -349,12 +348,11 @@ func RemoveSong(station_id int, song_id int) (*entities.Station, error) {
 	return station, nil
 }
 
-
 //TODO Shuffle Songs
 func ShuffleDefaults(creator string, stationName string) (*entities.Station, error) {
 	rand.Seed(time.Now().UnixNano())
 	station, err := GetStation(creator, stationName)
-	for _, song := range station.Songs{
+	for _, song := range station.Songs {
 		ResetVote(station.Id, song.Id)
 		priority := rand.Intn(len(station.Songs))
 		SetPriority(station.Id, song.Id, priority)
@@ -366,8 +364,6 @@ func ShuffleDefaults(creator string, stationName string) (*entities.Station, err
 	}
 	return station, nil
 }
-
-
 
 //TODO Make Mapper
 func getStationPlaying(station_id int) (*entities.Playing, error) {
@@ -411,6 +407,6 @@ func UpdatePlaying(creator string, stationName string, updatePlaying *entities.P
 	if err != nil {
 		return nil, err
 	}
-	station, _  := GetStation(creator, stationName)
+	station, _ := GetStation(creator, stationName)
 	return station, nil
 }
