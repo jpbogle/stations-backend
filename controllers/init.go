@@ -12,7 +12,6 @@ var db *sql.DB
 func init() {
 	var err error
 	db, err = sql.Open("mysql", "root:sharpiepop@/stations?allowNativePasswords=true&charset=utf8mb4&collation=utf8mb4_unicode_ci")
-	defer db.Close()
 	// db, err = sql.Open("mysql", "root:stationsRocks@/stations?charset=utf8mb4&collation=utf8mb4_unicode_ci")
 	if err != nil {
 		log.Fatalf("Error on initializing database connection: %s", err.Error())
