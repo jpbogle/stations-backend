@@ -396,7 +396,7 @@ func RemovePlaying(creator string, stationName string) {
 func UpdatePlaying(creator string, stationName string, updatePlaying *entities.Playing) (*entities.Station, error) {
 	RemovePlaying(creator, stationName)
 	station_id, err := GetStationId(creator, stationName)
-	_, err = db.Query(
+	rows, err := db.Query(
 		"INSERT INTO station_playing (station_id, song_id, position, timestamp, playing) values (?,?,?,?,?);",
 		station_id,
 		updatePlaying.Song.Id,
@@ -404,6 +404,7 @@ func UpdatePlaying(creator string, stationName string, updatePlaying *entities.P
 		updatePlaying.Timestamp,
 		updatePlaying.Playing,
 	)
+	defer rows.Close()
 	if err != nil {
 		return nil, err
 	}
